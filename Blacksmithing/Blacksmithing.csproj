@@ -53,6 +53,7 @@
     </Choose>
     <ItemGroup>
         <Reference Include="0Harmony, Version=2.5.5.0, Culture=neutral, PublicKeyToken=null">
+            <SpecificVersion>false</SpecificVersion>
           <HintPath>$(GamePath)\BepInEx\core\0Harmony.dll</HintPath>
         </Reference>
         <Reference Include="assembly_guiutils, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null">
@@ -65,7 +66,8 @@
           <HintPath>$(GamePath)\valheim_Data\Managed\publicized_assemblies\assembly_valheim_publicized.dll</HintPath>
         </Reference>
         <Reference Include="BepInEx, Version=5.4.16.0, Culture=neutral, PublicKeyToken=null">
-          <HintPath>$(GamePath)\BepInEx\core\BepInEx.dll</HintPath>
+            <SpecificVersion>false</SpecificVersion>
+            <HintPath>$(GamePath)\BepInEx\core\BepInEx.dll</HintPath>
         </Reference>
         <Reference Include="ExtendedItemDataFramework, Version=1.0.7.0, Culture=neutral, PublicKeyToken=null">
           <HintPath>$(GamePath)\BepInEx\plugins\ExtendedItemDataFramework.dll</HintPath>

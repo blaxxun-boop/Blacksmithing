@@ -1,4 +1,6 @@
-﻿using System.Reflection;
+﻿using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using BepInEx;
 using ExtendedItemDataFramework;
@@ -13,7 +15,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.0.0";
+	private const string ModVersion = "1.0.1";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly Skill blacksmithing = new("Blacksmithing", "blacksmithing.png");
@@ -45,32 +47,38 @@ public class Blacksmithing : BaseUnityPlugin
 		public static bool isCrafting = false;
 		public static void Prefix() => isCrafting = true;
 		public static void Finalizer() => isCrafting = false;
-	}
 
-	[HarmonyPatch(typeof(Gogan), nameof(Gogan.LogEvent))]
-	public class RaiseSkill
-	{
-		private static void Postfix(string eventAction)
+		private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
-			if (eventAction == "Crafted")
+			FieldInfo craftsField = AccessTools.DeclaredField(typeof(PlayerProfile.PlayerStats), nameof(PlayerProfile.PlayerStats.m_crafts));
+			foreach (CodeInstruction instruction in instructions)
 			{
-				if (InventoryGui.instance.m_craftRecipe.m_item.m_itemData.m_shared.m_itemType is
-				    ItemDrop.ItemData.ItemType.Bow or
-				    ItemDrop.ItemData.ItemType.Chest or
-				    ItemDrop.ItemData.ItemType.Hands or
-				    ItemDrop.ItemData.ItemType.Helmet or
-				    ItemDrop.ItemData.ItemType.Legs or
-				    ItemDrop.ItemData.ItemType.Shield or
-				    ItemDrop.ItemData.ItemType.Shoulder or
-				    ItemDrop.ItemData.ItemType.OneHandedWeapon or
-				    ItemDrop.ItemData.ItemType.TwoHandedWeapon)
+				yield return instruction;
+				if (instruction.opcode == OpCodes.Stfld && instruction.OperandIs(craftsField))
 				{
-					Player.m_localPlayer.RaiseSkill("Blacksmithing", 10f);
+					yield return new CodeInstruction(OpCodes.Call, AccessTools.DeclaredMethod(typeof(CheckCrafting), nameof(CheckBlacksmithingIncrease)));
 				}
 			}
 		}
+
+		private static void CheckBlacksmithingIncrease()
+		{
+			if (InventoryGui.instance.m_craftRecipe.m_item.m_itemData.m_shared.m_itemType is
+			    ItemDrop.ItemData.ItemType.Bow or
+			    ItemDrop.ItemData.ItemType.Chest or
+			    ItemDrop.ItemData.ItemType.Hands or
+			    ItemDrop.ItemData.ItemType.Helmet or
+			    ItemDrop.ItemData.ItemType.Legs or
+			    ItemDrop.ItemData.ItemType.Shield or
+			    ItemDrop.ItemData.ItemType.Shoulder or
+			    ItemDrop.ItemData.ItemType.OneHandedWeapon or
+			    ItemDrop.ItemData.ItemType.TwoHandedWeapon)
+			{
+				Player.m_localPlayer.RaiseSkill("Blacksmithing", 10f);
+			}
+		}
 	}
-	
+
 	[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), typeof(ItemDrop.ItemData), typeof(int), typeof(bool))]
 	public class UpdateDurabilityDisplay
 	{
