@@ -15,7 +15,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.0.1";
+	private const string ModVersion = "1.0.2";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly Skill blacksmithing = new("Blacksmithing", "blacksmithing.png");
@@ -86,7 +86,7 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (crafting && item.m_shared.m_useDurability)
 			{
-				float skill = Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing"));
+				float skill = Player.m_localPlayer.GetSkillFactor("Blacksmithing");
 				if (skill > 0)
 				{
 					__result = new Regex("(\\$item_durability.*)").Replace(__result, $"$1 (<color=orange>+{Mathf.Round(skill * item.GetMaxDurability())}</color>)");
