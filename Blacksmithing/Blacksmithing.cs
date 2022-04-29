@@ -20,7 +20,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.0";
+	private const string ModVersion = "1.1.1";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -138,11 +138,23 @@ public class Blacksmithing : BaseUnityPlugin
 	[HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.Awake))]
 	public class IncreaseCraftingSkill
 	{
+		private static bool hasRun = false;
+
 		[UsedImplicitly]
-		public static void Postfix() => ApplyTranspilerToAll(new List<MethodInfo>
+		public static void Postfix()
 		{
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting)),
-		}, AccessTools.DeclaredMethod(typeof(IncreaseCraftingSkill), nameof(Transpiler)));
+			if (hasRun)
+			{
+				return;
+			}
+
+			ApplyTranspilerToAll(new List<MethodInfo>
+			{
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting))
+			}, AccessTools.DeclaredMethod(typeof(IncreaseCraftingSkill), nameof(Transpiler)));
+
+			hasRun = true;
+		}
 
 		private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
@@ -214,15 +226,27 @@ public class Blacksmithing : BaseUnityPlugin
 	[HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.Awake))]
 	public class IncreaseMaximumUpgradeLevel
 	{
+		private static bool hasRun = false;
+
 		[UsedImplicitly]
-		public static void Postfix() => ApplyTranspilerToAll(new List<MethodInfo>
+		public static void Postfix()
 		{
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipeList)),
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.AddRecipeToList)),
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipe)),
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting)),
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.SetupUpgradeItem)),
-		}, AccessTools.DeclaredMethod(typeof(IncreaseMaximumUpgradeLevel), nameof(Transpiler)));
+			if (hasRun)
+			{
+				return;
+			}
+
+			ApplyTranspilerToAll(new List<MethodInfo>
+			{
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipeList)),
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.AddRecipeToList)),
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipe)),
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting)),
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.SetupUpgradeItem))
+			}, AccessTools.DeclaredMethod(typeof(IncreaseMaximumUpgradeLevel), nameof(Transpiler)));
+
+			hasRun = true;
+		}
 
 		private static readonly FieldInfo maxQualityField = AccessTools.DeclaredField(typeof(ItemDrop.ItemData.SharedData), nameof(ItemDrop.ItemData.SharedData.m_maxQuality));
 
