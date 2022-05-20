@@ -20,7 +20,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.1";
+	private const string ModVersion = "1.1.2";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -112,15 +112,15 @@ public class Blacksmithing : BaseUnityPlugin
 	private static bool CheckBlacksmithingItem(ItemDrop.ItemData.SharedData item)
 	{
 		return item.m_itemType is
-			ItemDrop.ItemData.ItemType.Bow or
-			ItemDrop.ItemData.ItemType.Chest or
-			ItemDrop.ItemData.ItemType.Hands or
-			ItemDrop.ItemData.ItemType.Helmet or
-			ItemDrop.ItemData.ItemType.Legs or
-			ItemDrop.ItemData.ItemType.Shield or
-			ItemDrop.ItemData.ItemType.Shoulder or
-			ItemDrop.ItemData.ItemType.OneHandedWeapon or
-			ItemDrop.ItemData.ItemType.TwoHandedWeapon;
+			       ItemDrop.ItemData.ItemType.Bow or
+			       ItemDrop.ItemData.ItemType.Chest or
+			       ItemDrop.ItemData.ItemType.Hands or
+			       ItemDrop.ItemData.ItemType.Helmet or
+			       ItemDrop.ItemData.ItemType.Legs or
+			       ItemDrop.ItemData.ItemType.Shield or
+			       ItemDrop.ItemData.ItemType.Shoulder or
+			       ItemDrop.ItemData.ItemType.TwoHandedWeapon ||
+		       (item.m_itemType is ItemDrop.ItemData.ItemType.OneHandedWeapon && !item.m_attack.m_consumeItem);
 	}
 
 	[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.DoCrafting))]
