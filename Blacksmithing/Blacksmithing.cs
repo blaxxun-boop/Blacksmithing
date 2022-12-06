@@ -6,7 +6,7 @@ using System.Reflection.Emit;
 using System.Text.RegularExpressions;
 using BepInEx;
 using BepInEx.Configuration;
-using ExtendedItemDataFramework;
+using ItemDataManager;
 using HarmonyLib;
 using JetBrains.Annotations;
 using ServerSync;
@@ -16,11 +16,10 @@ using UnityEngine;
 namespace Blacksmithing;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
-[BepInDependency("randyknapp.mods.extendeditemdataframework")]
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.4";
+	private const string ModVersion = "1.1.5";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -76,15 +75,6 @@ public class Blacksmithing : BaseUnityPlugin
 
 		Assembly assembly = Assembly.GetExecutingAssembly();
 		harmony.PatchAll(assembly);
-
-		ExtendedItemData.NewExtendedItemData += e =>
-		{
-			if (CheckCrafting.isCrafting && e.m_shared.m_useDurability)
-			{
-				e.AddComponent<SaveSkill>().skill = Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100);
-				e.m_durability = e.GetMaxDurability();
-			}
-		};
 	}
 
 	private static void ApplyTranspilerToAll(List<MethodInfo> methods, MethodInfo transpiler)
@@ -119,20 +109,28 @@ public class Blacksmithing : BaseUnityPlugin
 			       ItemDrop.ItemData.ItemType.Legs or
 			       ItemDrop.ItemData.ItemType.Shield or
 			       ItemDrop.ItemData.ItemType.Shoulder or
-			       ItemDrop.ItemData.ItemType.TwoHandedWeapon ||
+			       ItemDrop.ItemData.ItemType.TwoHandedWeapon or
+			       ItemDrop.ItemData.ItemType.TwoHandedWeaponLeft ||
 		       (item.m_itemType is ItemDrop.ItemData.ItemType.OneHandedWeapon && !item.m_attack.m_consumeItem);
 	}
 
 	[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.DoCrafting))]
 	public class CheckCrafting
 	{
-		public static bool isCrafting = false;
+		[UsedImplicitly]
+		public static void Prefix(InventoryGui __instance)
+		{
+			if (__instance.m_craftRecipe is not null)
+			{
+				__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] = Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100).ToString();
+			}
+		}
 
 		[UsedImplicitly]
-		public static void Prefix() => isCrafting = true;
-
-		[UsedImplicitly]
-		public static void Finalizer() => isCrafting = false;
+		public static void Finalizer(InventoryGui __instance)
+		{
+			__instance.m_craftRecipe?.m_item.m_itemData.Data().Remove("Blacksmithing");
+		}
 	}
 
 	[HarmonyPatch(typeof(FejdStartup), nameof(FejdStartup.Awake))]
@@ -173,14 +171,6 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (CheckBlacksmithingItem(InventoryGui.instance.m_craftRecipe.m_item.m_itemData.m_shared))
 			{
-				if (InventoryGui.instance.m_craftUpgradeItem?.Extended() is { } e)
-				{
-					if (CheckCrafting.isCrafting && e.m_shared.m_useDurability)
-					{
-						(e.GetComponent<SaveSkill>() ?? e.AddComponent<SaveSkill>()).skill = Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100);
-						e.m_durability = e.GetMaxDurability();
-					}
-				}
 				Player.m_localPlayer.RaiseSkill("Blacksmithing", 10f);
 			}
 		}
@@ -216,9 +206,9 @@ public class Blacksmithing : BaseUnityPlugin
 
 		private static void Postfix(ItemDrop.ItemData __instance, ref float __result)
 		{
-			if (!skipDurabilityDisplay && __instance.Extended()?.GetComponent<SaveSkill>() is { } saveSkill)
+			if (!skipDurabilityDisplay && __instance.Data()["Blacksmithing"] is { } saveSkill)
 			{
-				__result *= 1 + saveSkill.skill * blacksmithing.SkillEffectFactor / 100 * (durabilityFactor.Value - 1);
+				__result *= 1 + int.Parse(saveSkill) * blacksmithing.SkillEffectFactor / 100 * (durabilityFactor.Value - 1);
 			}
 		}
 	}
@@ -317,19 +307,5 @@ public class Blacksmithing : BaseUnityPlugin
 				++__result;
 			}
 		}
-	}
-
-	[PublicAPI]
-	public class SaveSkill : BaseExtendedItemComponent
-	{
-		public int skill;
-
-		public SaveSkill(ExtendedItemData parent) : base(typeof(SaveSkill).AssemblyQualifiedName, parent) { }
-
-		public override string Serialize() => skill.ToString();
-
-		public override void Deserialize(string data) => int.TryParse(data, out skill);
-
-		public override BaseExtendedItemComponent Clone() => (BaseExtendedItemComponent)MemberwiseClone();
 	}
 }
