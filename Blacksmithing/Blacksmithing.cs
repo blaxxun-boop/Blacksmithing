@@ -19,7 +19,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.5";
+	private const string ModVersion = "1.1.6";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -120,7 +120,7 @@ public class Blacksmithing : BaseUnityPlugin
 		[UsedImplicitly]
 		public static void Prefix(InventoryGui __instance)
 		{
-			if (__instance.m_craftRecipe is not null)
+			if (__instance.m_craftRecipe is not null && CheckBlacksmithingItem(__instance.m_craftRecipe.m_item.m_itemData.m_shared))
 			{
 				__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] = Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100).ToString();
 			}
