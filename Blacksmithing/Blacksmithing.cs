@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Reflection;
@@ -19,7 +20,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.7";
+	private const string ModVersion = "1.1.8";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -123,7 +124,7 @@ public class Blacksmithing : BaseUnityPlugin
 			__state = __instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] is null;
 			if (__instance.m_craftRecipe is not null && CheckBlacksmithingItem(__instance.m_craftRecipe.m_item.m_itemData.m_shared))
 			{
-				__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] = Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100).ToString();
+				__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] = Math.Max(Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100), int.Parse(__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] ?? "0")).ToString();
 			}
 		}
 
