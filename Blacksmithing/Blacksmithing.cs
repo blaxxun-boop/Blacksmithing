@@ -20,16 +20,23 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.1.8";
+	private const string ModVersion = "1.2.0";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
 
 	private static ConfigEntry<Toggle> serverConfigLocked = null!;
-	private static ConfigEntry<int> craftingStationLevelIncrease = null!;
+	private static ConfigEntry<int> workbenchFirstLevelIncrease = null!;
+	private static ConfigEntry<int> workbenchSecondLevelIncrease = null!;
+	private static ConfigEntry<int> forgeFirstLevelIncrease = null!;
+	private static ConfigEntry<int> forgeSecondLevelIncrease = null!;
+	private static ConfigEntry<int> blackForgeFirstLevelIncrease = null!;
+	private static ConfigEntry<int> blackForgeSecondLevelIncrease = null!;
+	private static ConfigEntry<int> repairLevelRequirement = null!;
 	private static ConfigEntry<int> upgradeLevelRequirement = null!;
 	private static ConfigEntry<float> durabilityFactor = null!;
 	private static ConfigEntry<float> experienceGainedFactor = null!;
+	private static ConfigEntry<int> experienceLoss = null!;
 
 	private ConfigEntry<T> config<T>(string group, string name, T value, ConfigDescription description, bool synchronizedSetting = true)
 	{
@@ -51,6 +58,7 @@ public class Blacksmithing : BaseUnityPlugin
 
 	private class ConfigurationManagerAttributes
 	{
+		[UsedImplicitly] public int? Order;
 		[UsedImplicitly] public bool? ShowRangeAsPercent;
 	}
 
@@ -65,17 +73,56 @@ public class Blacksmithing : BaseUnityPlugin
 		blacksmithing.Description.German("Erhöht die Haltbarkeit hergestellter Rüstung und Waffen.");
 		blacksmithing.Configurable = false;
 
-		serverConfigLocked = config("1 - General", "Lock Configuration", Toggle.On, "If on, the configuration is locked and can be changed by server admins only.");
+		int order = 0;
+
+		serverConfigLocked = config("1 - General", "Lock Configuration", Toggle.On, new ConfigDescription("If on, the configuration is locked and can be changed by server admins only.", null, new ConfigurationManagerAttributes { Order = --order }));
 		configSync.AddLockingConfigEntry(serverConfigLocked);
-		craftingStationLevelIncrease = config("2 - Crafting", "Skill Level for Crafting Station Upgrade", 50, new ConfigDescription("Minimum skill level to count as a crafting station upgrade. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false }));
-		upgradeLevelRequirement = config("2 - Crafting", "Skill Level for Extra Upgrade Level", 80, new ConfigDescription("Minimum skill level for an additional upgrade level for armor and weapons. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false }));
-		durabilityFactor = config("2 - Crafting", "Durability Factor", 2f, new ConfigDescription("Factor for durability of armor and weapons at skill level 100.", new AcceptableValueRange<float>(1f, 5f)));
-		experienceGainedFactor = config("3 - Other", "Skill Experience Gain Factor", 1f, new ConfigDescription("Factor for experience gained for the blacksmithing skill.", new AcceptableValueRange<float>(0.01f, 5f)));
+		workbenchFirstLevelIncrease = config("2 - Crafting", "Skill Level for first Workbench Upgrade", 10, new ConfigDescription("Minimum skill level to count as one crafting station upgrade for the workbench. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		workbenchSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Workbench Upgrade", 20, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the workbench. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		forgeFirstLevelIncrease = config("2 - Crafting", "Skill Level for first Forge Upgrade", 30, new ConfigDescription("Minimum skill level to count as one crafting station upgrade for the forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		forgeSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Forge Upgrade", 40, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		blackForgeFirstLevelIncrease = config("2 - Crafting", "Skill Level for first Black Forge Upgrade", 50, new ConfigDescription("Minimum skill level to count as one crafting station upgrade for the black forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		blackForgeSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Black Forge Upgrade", 60, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the black forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		repairLevelRequirement = config("2 - Crafting", "Skill Level for Inventory Repair", 70, new ConfigDescription("Minimum skill level to be able to repair items from the inventory. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		upgradeLevelRequirement = config("2 - Crafting", "Skill Level for Extra Upgrade Level", 80, new ConfigDescription("Minimum skill level for an additional upgrade level for armor and weapons. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		durabilityFactor = config("2 - Crafting", "Durability Factor", 2f, new ConfigDescription("Factor for durability of armor and weapons at skill level 100.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
+		experienceGainedFactor = config("3 - Other", "Skill Experience Gain Factor", 1f, new ConfigDescription("Factor for experience gained for the blacksmithing skill.", new AcceptableValueRange<float>(0.01f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		experienceGainedFactor.SettingChanged += (_, _) => blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
 		blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
+		experienceLoss = config("3 - Other", "Skill Experience Loss", 0, new ConfigDescription("How much experience to lose in the blacksmithing skill on death.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { Order = --order }));
+		experienceLoss.SettingChanged += (_, _) => blacksmithing.SkillLoss = experienceLoss.Value;
+		blacksmithing.SkillLoss = experienceLoss.Value;
 
 		Assembly assembly = Assembly.GetExecutingAssembly();
 		harmony.PatchAll(assembly);
+	}
+	
+	private static bool CanRepairFromEverywhere() => repairLevelRequirement.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= repairLevelRequirement.Value;
+
+	[HarmonyPatch]
+	private static class AllowRepairingFromInventory
+	{
+		private static IEnumerable<MethodInfo> TargetMethods() => new[]
+		{
+			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRepair)),
+			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.CanRepair)),
+			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.HaveRepairableItems)),
+			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.RepairOneItem))
+		};
+
+		private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+		{
+			MethodInfo cheatCheck = AccessTools.DeclaredMethod(typeof(Player), nameof(Player.NoCostCheat));
+			foreach (CodeInstruction instruction in instructions)
+			{
+				yield return instruction;
+				if (instruction.Calls(cheatCheck))
+				{
+					yield return new CodeInstruction(OpCodes.Call, AccessTools.DeclaredMethod(typeof(Blacksmithing), nameof(CanRepairFromEverywhere)));
+					yield return new CodeInstruction(OpCodes.Or);
+				}
+			}
+		}
 	}
 
 	private static void ApplyTranspilerToAll(List<MethodInfo> methods, MethodInfo transpiler)
@@ -307,9 +354,44 @@ public class Blacksmithing : BaseUnityPlugin
 	{
 		private static void Postfix(CraftingStation __instance, ref int __result)
 		{
-			if (craftingStationLevelIncrease.Value > 0 && __instance.m_name is "$piece_workbench" or "$piece_forge" && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= craftingStationLevelIncrease.Value)
+			switch (__instance.m_name)
 			{
-				++__result;
+				case "$piece_workbench":
+				{
+					if (workbenchFirstLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= workbenchFirstLevelIncrease.Value)
+					{
+						++__result;
+					}
+					if (workbenchSecondLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= workbenchSecondLevelIncrease.Value)
+					{
+						++__result;
+					}
+					break;
+				}
+				case "$piece_forge":
+				{
+					if (forgeFirstLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= forgeFirstLevelIncrease.Value)
+					{
+						++__result;
+					}
+					if (forgeSecondLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= forgeSecondLevelIncrease.Value)
+					{
+						++__result;
+					}
+					break;
+				}
+				case "$piece_blackforge":
+				{
+					if (blackForgeFirstLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= blackForgeFirstLevelIncrease.Value)
+					{
+						++__result;
+					}
+					if (blackForgeSecondLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= blackForgeSecondLevelIncrease.Value)
+					{
+						++__result;
+					}
+					break;
+				}
 			}
 		}
 	}
