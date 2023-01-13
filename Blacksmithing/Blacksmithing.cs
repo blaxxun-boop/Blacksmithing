@@ -21,7 +21,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.2.1";
+	private const string ModVersion = "1.2.2";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -38,6 +38,7 @@ public class Blacksmithing : BaseUnityPlugin
 	private static ConfigEntry<int> repairLevelRequirement = null!;
 	private static ConfigEntry<int> upgradeLevelRequirement = null!;
 	private static ConfigEntry<float> durabilityFactor = null!;
+	private static ConfigEntry<float> additionalUpgradePriceFactor = null!;
 	private static ConfigEntry<float> experienceGainedFactor = null!;
 	private static ConfigEntry<int> experienceLoss = null!;
 
@@ -91,6 +92,7 @@ public class Blacksmithing : BaseUnityPlugin
 		repairLevelRequirement = config("2 - Crafting", "Skill Level for Inventory Repair", 70, new ConfigDescription("Minimum skill level to be able to repair items from the inventory. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		upgradeLevelRequirement = config("2 - Crafting", "Skill Level for Extra Upgrade Level", 80, new ConfigDescription("Minimum skill level for an additional upgrade level for armor and weapons. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		durabilityFactor = config("2 - Crafting", "Durability Factor", 2f, new ConfigDescription("Factor for durability of armor and weapons at skill level 100.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
+		additionalUpgradePriceFactor = config("2 - Crafting", "Price Factor", 3f, new ConfigDescription("Factor for the price of the additional upgrade.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		experienceGainedFactor = config("3 - Other", "Skill Experience Gain Factor", 1f, new ConfigDescription("Factor for experience gained for the blacksmithing skill.", new AcceptableValueRange<float>(0.01f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		experienceGainedFactor.SettingChanged += (_, _) => blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
 		blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
@@ -327,7 +329,7 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (SaveCraftingItemPlayer.item != null && qualityLevel > SaveCraftingItemPlayer.item.m_shared.m_maxQuality)
 			{
-				__result *= 3;
+				__result = Mathf.FloorToInt(__result * additionalUpgradePriceFactor.Value);
 			}
 		}
 	}
