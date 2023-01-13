@@ -17,10 +17,11 @@ using UnityEngine;
 namespace Blacksmithing;
 
 [BepInPlugin(ModGUID, ModName, ModVersion)]
+[BepInIncompatibility("org.bepinex.plugins.valheim_plus")]
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.2.0";
+	private const string ModVersion = "1.2.1";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -32,6 +33,8 @@ public class Blacksmithing : BaseUnityPlugin
 	private static ConfigEntry<int> forgeSecondLevelIncrease = null!;
 	private static ConfigEntry<int> blackForgeFirstLevelIncrease = null!;
 	private static ConfigEntry<int> blackForgeSecondLevelIncrease = null!;
+	private static ConfigEntry<int> galdrTableFirstLevelIncrease = null!;
+	private static ConfigEntry<int> galdrTableSecondLevelIncrease = null!;
 	private static ConfigEntry<int> repairLevelRequirement = null!;
 	private static ConfigEntry<int> upgradeLevelRequirement = null!;
 	private static ConfigEntry<float> durabilityFactor = null!;
@@ -83,6 +86,8 @@ public class Blacksmithing : BaseUnityPlugin
 		forgeSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Forge Upgrade", 40, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		blackForgeFirstLevelIncrease = config("2 - Crafting", "Skill Level for first Black Forge Upgrade", 50, new ConfigDescription("Minimum skill level to count as one crafting station upgrade for the black forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		blackForgeSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Black Forge Upgrade", 60, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the black forge. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		galdrTableFirstLevelIncrease = config("2 - Crafting", "Skill Level for first Galdr Table Upgrade", 50, new ConfigDescription("Minimum skill level to count as one crafting station upgrade for the galdr table. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		galdrTableSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Galdr Table Upgrade", 60, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the galdr table. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		repairLevelRequirement = config("2 - Crafting", "Skill Level for Inventory Repair", 70, new ConfigDescription("Minimum skill level to be able to repair items from the inventory. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		upgradeLevelRequirement = config("2 - Crafting", "Skill Level for Extra Upgrade Level", 80, new ConfigDescription("Minimum skill level for an additional upgrade level for armor and weapons. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		durabilityFactor = config("2 - Crafting", "Durability Factor", 2f, new ConfigDescription("Factor for durability of armor and weapons at skill level 100.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
@@ -96,7 +101,7 @@ public class Blacksmithing : BaseUnityPlugin
 		Assembly assembly = Assembly.GetExecutingAssembly();
 		harmony.PatchAll(assembly);
 	}
-	
+
 	private static bool CanRepairFromEverywhere() => repairLevelRequirement.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= repairLevelRequirement.Value;
 
 	[HarmonyPatch]
@@ -168,11 +173,12 @@ public class Blacksmithing : BaseUnityPlugin
 		[UsedImplicitly]
 		public static void Prefix(InventoryGui __instance, out bool __state)
 		{
-			__state = __instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] is null;
+			__state = __instance.m_craftRecipe?.m_item.m_itemData.Data()["Blacksmithing"] is null;
 			if (__instance.m_craftRecipe is not null && CheckBlacksmithingItem(__instance.m_craftRecipe.m_item.m_itemData.m_shared))
 			{
 				__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] = Math.Max(Mathf.RoundToInt(Player.m_localPlayer.GetSkillFactor(Skill.fromName("Blacksmithing")) * 100), int.Parse(__instance.m_craftRecipe.m_item.m_itemData.Data()["Blacksmithing"] ?? "0")).ToString();
 			}
+			SaveCraftingItemPlayer.item = __instance.m_craftRecipe?.m_item.m_itemData;
 		}
 
 		[UsedImplicitly]
@@ -182,6 +188,7 @@ public class Blacksmithing : BaseUnityPlugin
 			{
 				__instance.m_craftRecipe?.m_item.m_itemData.Data().Remove("Blacksmithing");
 			}
+			SaveCraftingItemPlayer.item = null;
 		}
 	}
 
@@ -330,12 +337,13 @@ public class Blacksmithing : BaseUnityPlugin
 	{
 		public static ItemDrop.ItemData? item;
 
-		private static void Prefix(Recipe recipe)
+		private static void Prefix(Recipe recipe, out ItemDrop.ItemData? __state)
 		{
+			__state = item;
 			item = recipe.m_item.m_itemData;
 		}
 
-		private static void Finalizer() => item = null;
+		private static void Finalizer(ItemDrop.ItemData? __state) => item = __state;
 	}
 
 	[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.SetupRequirement))]
@@ -387,6 +395,18 @@ public class Blacksmithing : BaseUnityPlugin
 						++__result;
 					}
 					if (blackForgeSecondLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= blackForgeSecondLevelIncrease.Value)
+					{
+						++__result;
+					}
+					break;
+				}
+				case "$piece_magetable":
+				{
+					if (galdrTableFirstLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= galdrTableFirstLevelIncrease.Value)
+					{
+						++__result;
+					}
+					if (galdrTableSecondLevelIncrease.Value > 0 && Player.m_localPlayer.GetSkillFactor("Blacksmithing") * 100 >= galdrTableSecondLevelIncrease.Value)
 					{
 						++__result;
 					}
