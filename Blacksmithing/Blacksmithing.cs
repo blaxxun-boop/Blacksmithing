@@ -21,7 +21,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.2.3";
+	private const string ModVersion = "1.2.4";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -57,7 +57,7 @@ public class Blacksmithing : BaseUnityPlugin
 	private enum Toggle
 	{
 		On = 1,
-		Off = 0
+		Off = 0,
 	}
 
 	private class ConfigurationManagerAttributes
@@ -114,7 +114,7 @@ public class Blacksmithing : BaseUnityPlugin
 			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRepair)),
 			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.CanRepair)),
 			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.HaveRepairableItems)),
-			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.RepairOneItem))
+			AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.RepairOneItem)),
 		};
 
 		private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -209,7 +209,7 @@ public class Blacksmithing : BaseUnityPlugin
 
 			ApplyTranspilerToAll(new List<MethodInfo>
 			{
-				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting))
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting)),
 			}, AccessTools.DeclaredMethod(typeof(IncreaseCraftingSkill), nameof(Transpiler)));
 
 			hasRun = true;
@@ -217,12 +217,14 @@ public class Blacksmithing : BaseUnityPlugin
 
 		private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
 		{
-			FieldInfo craftsField = AccessTools.DeclaredField(typeof(PlayerProfile.PlayerStats), nameof(PlayerProfile.PlayerStats.m_crafts));
+			MethodInfo statIncrement = AccessTools.DeclaredMethod(typeof(PlayerProfile), nameof(PlayerProfile.IncrementStat));
+			bool first = true;
 			foreach (CodeInstruction instruction in instructions)
 			{
 				yield return instruction;
-				if (instruction.opcode == OpCodes.Stfld && instruction.OperandIs(craftsField))
+				if (first && instruction.Calls(statIncrement))
 				{
+					first = false;
 					yield return new CodeInstruction(OpCodes.Call, AccessTools.DeclaredMethod(typeof(IncreaseCraftingSkill), nameof(CheckBlacksmithingIncrease)));
 				}
 			}
@@ -237,7 +239,7 @@ public class Blacksmithing : BaseUnityPlugin
 		}
 	}
 
-	[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), typeof(ItemDrop.ItemData), typeof(int), typeof(bool))]
+	[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float))]
 	public class UpdateDurabilityDisplay
 	{
 		[UsedImplicitly]
@@ -293,7 +295,7 @@ public class Blacksmithing : BaseUnityPlugin
 				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.AddRecipeToList)),
 				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipe)),
 				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.DoCrafting)),
-				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.SetupUpgradeItem))
+				AccessTools.DeclaredMethod(typeof(InventoryGui), nameof(InventoryGui.SetupUpgradeItem)),
 			}, AccessTools.DeclaredMethod(typeof(IncreaseMaximumUpgradeLevel), nameof(Transpiler)));
 
 			hasRun = true;
