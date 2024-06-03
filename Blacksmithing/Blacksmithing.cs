@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -21,7 +22,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.2.5";
+	private const string ModVersion = "1.3.0";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -37,7 +38,11 @@ public class Blacksmithing : BaseUnityPlugin
 	private static ConfigEntry<int> galdrTableSecondLevelIncrease = null!;
 	private static ConfigEntry<int> repairLevelRequirement = null!;
 	private static ConfigEntry<int> upgradeLevelRequirement = null!;
+	private static ConfigEntry<int> firstCraftBonus = null!;
 	private static ConfigEntry<float> durabilityFactor = null!;
+	private static ConfigEntry<float> baseDurabilityFactor = null!;
+	private static ConfigEntry<int> experienceReductionThreshold = null!;
+	private static ConfigEntry<float> experienceReductionPower = null!;
 	private static ConfigEntry<float> additionalUpgradePriceFactor = null!;
 	private static ConfigEntry<float> experienceGainedFactor = null!;
 	private static ConfigEntry<int> experienceLoss = null!;
@@ -72,7 +77,7 @@ public class Blacksmithing : BaseUnityPlugin
 	public void Awake()
 	{
 		blacksmithing = new Skill("Blacksmithing", "blacksmithing.png");
-		blacksmithing.Description.English("Increases the durability of created armor and weapons.");
+		blacksmithing.Description.English("Increases the durability of crafted armor and weapons.");
 		blacksmithing.Name.German("Schmiedekunst");
 		blacksmithing.Description.German("Erhöht die Haltbarkeit hergestellter Rüstung und Waffen.");
 		blacksmithing.Configurable = false;
@@ -91,8 +96,12 @@ public class Blacksmithing : BaseUnityPlugin
 		galdrTableSecondLevelIncrease = config("2 - Crafting", "Skill Level for second Galdr Table Upgrade", 60, new ConfigDescription("Minimum skill level to count as two crafting station upgrades for the galdr table. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		repairLevelRequirement = config("2 - Crafting", "Skill Level for Inventory Repair", 70, new ConfigDescription("Minimum skill level to be able to repair items from the inventory. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
 		upgradeLevelRequirement = config("2 - Crafting", "Skill Level for Extra Upgrade Level", 80, new ConfigDescription("Minimum skill level for an additional upgrade level for armor and weapons. 0 means disabled.", new AcceptableValueRange<int>(0, 100), new ConfigurationManagerAttributes { ShowRangeAsPercent = false, Order = --order }));
+		baseDurabilityFactor = config("2 - Crafting", "Base Durability Factor", 1f, new ConfigDescription("Factor for durability of armor and weapons at skill level 0.", new AcceptableValueRange<float>(0.01f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		durabilityFactor = config("2 - Crafting", "Durability Factor", 2f, new ConfigDescription("Factor for durability of armor and weapons at skill level 100.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		additionalUpgradePriceFactor = config("2 - Crafting", "Price Factor", 3f, new ConfigDescription("Factor for the price of the additional upgrade.", new AcceptableValueRange<float>(1f, 5f), new ConfigurationManagerAttributes { Order = --order }));
+		firstCraftBonus = config("2 - Crafting", "First Craft Bonus", 75, new ConfigDescription("Additional blacksmithing experience gained the first time an item is crafted.", new AcceptableValueRange<int>(0, 200), new ConfigurationManagerAttributes { Order = --order }));
+		experienceReductionThreshold = config("2 - Crafting", "Experience Reduction Threshold", 5, new ConfigDescription("After crafting an item this amount of times, crafting it will give reduced blacksmithing experience. Use 0 to disable this.", new AcceptableValueRange<int>(0, 50), new ConfigurationManagerAttributes { Order = --order }));
+		experienceReductionPower = config("2 - Crafting", "Experience Reduction Factor", 0.5f, new ConfigDescription("Factor at which the blacksmithing experience gain is reduced, once too many of the same item have been crafted. Additive, not multiplicative. E.g. reducing the experience gained by 50% every 5 crafts means that you won't get any experience anymore after the 10th craft.", new AcceptableValueRange<float>(0f, 1f), new ConfigurationManagerAttributes { Order = --order }));
 		experienceGainedFactor = config("3 - Other", "Skill Experience Gain Factor", 1f, new ConfigDescription("Factor for experience gained for the blacksmithing skill.", new AcceptableValueRange<float>(0.01f, 5f), new ConfigurationManagerAttributes { Order = --order }));
 		experienceGainedFactor.SettingChanged += (_, _) => blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
 		blacksmithing.SkillGainFactor = experienceGainedFactor.Value;
@@ -234,7 +243,14 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (CheckBlacksmithingItem(InventoryGui.instance.m_craftRecipe.m_item.m_itemData.m_shared))
 			{
-				Player.m_localPlayer.RaiseSkill("Blacksmithing", 10f);
+				Game.instance.m_playerProfile.m_itemCraftStats.TryGetValue(InventoryGui.instance.m_craftRecipe.m_item.m_itemData.m_shared.m_name, out float crafts);
+				
+				float raise = 15f * (experienceReductionThreshold.Value > 0 ? Mathf.Max(1 - crafts / experienceReductionThreshold.Value * experienceReductionPower.Value, 0) : 1);
+				if (crafts <= 0)
+				{
+					raise += firstCraftBonus.Value;
+				}
+				Player.m_localPlayer.RaiseSkill("Blacksmithing", raise);
 			}
 		}
 	}
@@ -250,11 +266,22 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (crafting && item.m_shared.m_useDurability)
 			{
-				float skill = Player.m_localPlayer.GetSkillFactor("Blacksmithing");
-				if (skill > 0)
+				__result = Regex.Replace(__result, @"(\$item_durability.*)(?<=[^0-9\.])([0-9\.]+)(.*)", match =>
 				{
-					__result = new Regex("(\\$item_durability.*)").Replace(__result, $"$1 (<color=orange>+{Mathf.Round(skill * item.GetMaxDurability(qualityLevel) * (durabilityFactor.Value - 1))}</color>)");
-				}
+					string maxDurabilityStr = match.Groups[2].ToString();
+					if (float.TryParse(maxDurabilityStr, out float maxDurability))
+					{
+						maxDurabilityStr = (maxDurability * baseDurabilityFactor.Value).ToString("0");
+					}
+					string desc = $"{match.Groups[1]}{maxDurabilityStr}{match.Groups[3]}";
+
+					float skill = Player.m_localPlayer.GetSkillFactor("Blacksmithing");
+					if (skill > 0)
+					{
+						desc += $" (<color=orange>+{Mathf.Round(skill * item.GetMaxDurability(qualityLevel) * baseDurabilityFactor.Value * (durabilityFactor.Value - 1))}</color>)";
+					}
+					return desc;
+				});
 			}
 		}
 
@@ -271,7 +298,7 @@ public class Blacksmithing : BaseUnityPlugin
 		{
 			if (!skipDurabilityDisplay && __instance.Data()["Blacksmithing"] is { } saveSkill)
 			{
-				__result *= 1 + int.Parse(saveSkill) * blacksmithing.SkillEffectFactor / 100 * (durabilityFactor.Value - 1);
+				__result *= baseDurabilityFactor.Value * (1 + int.Parse(saveSkill) * blacksmithing.SkillEffectFactor / 100 * (durabilityFactor.Value - 1));
 			}
 		}
 	}
@@ -416,6 +443,48 @@ public class Blacksmithing : BaseUnityPlugin
 					}
 					break;
 				}
+			}
+		}
+	}
+
+	[HarmonyPatch(typeof(PlayerProfile), nameof(PlayerProfile.SavePlayerData))]
+	private static class SaveCraftStats
+	{
+		private static void Prefix(PlayerProfile __instance, Player player)
+		{
+			foreach (KeyValuePair<string, float> stat in __instance.m_itemCraftStats)
+			{
+				player.m_customData["craft_item " + stat.Key] = stat.Value.ToString(CultureInfo.InvariantCulture);
+			}
+		}
+	}
+
+	[HarmonyPatch(typeof(PlayerProfile), nameof(PlayerProfile.LoadPlayerData))]
+	private static class LoadCraftStats
+	{
+		private static void Postfix(PlayerProfile __instance, Player player)
+		{
+			if (ZNetScene.instance)
+			{
+				foreach (GameObject gameObject in ObjectDB.instance.m_items)
+				{
+					if (gameObject.GetComponent<ItemDrop>() is { } item && player.m_customData.TryGetValue("craft_item " + item.m_itemData.m_shared.m_name, out string valueStr) && float.TryParse(valueStr, NumberStyles.Float, CultureInfo.InvariantCulture, out float value) && !__instance.m_itemCraftStats.ContainsKey(item.m_itemData.m_shared.m_name))
+					{
+						__instance.m_itemCraftStats[item.m_itemData.m_shared.m_name] = value;
+					}
+				}
+			}
+		}
+	}
+
+	[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.UpdateRecipe))]
+	private class ChangeDisplay
+	{
+		private static void Postfix(InventoryGui __instance)
+		{
+			if (__instance.InCraftTab() && __instance.m_selectedRecipe.Key is { } recipe && CheckBlacksmithingItem(recipe.m_item.m_itemData.m_shared) && (!Game.instance.m_playerProfile.m_itemCraftStats.TryGetValue(recipe.m_item.m_itemData.m_shared.m_name, out float crafts) || crafts <= 0))
+			{
+				__instance.m_recipeDecription.text += "\n\n<color=orange>First craft bonus available</color>";
 			}
 		}
 	}
