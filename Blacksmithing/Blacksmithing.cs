@@ -80,6 +80,8 @@ public class Blacksmithing : BaseUnityPlugin
 		blacksmithing.Description.English("Increases the durability of crafted armor and weapons.");
 		blacksmithing.Name.German("Schmiedekunst");
 		blacksmithing.Description.German("Erhöht die Haltbarkeit hergestellter Rüstung und Waffen.");
+		blacksmithing.Name.Chinese("锻造");
+		blacksmithing.Description.Chinese("提高锻造的盔甲与武器的耐久");
 		blacksmithing.Configurable = false;
 
 		int order = 0;
