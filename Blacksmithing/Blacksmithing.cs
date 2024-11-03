@@ -22,7 +22,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.3.0";
+	private const string ModVersion = "1.3.1";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -255,7 +255,7 @@ public class Blacksmithing : BaseUnityPlugin
 		}
 	}
 
-	[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float))]
+	[HarmonyPatch(typeof(ItemDrop.ItemData), nameof(ItemDrop.ItemData.GetTooltip), typeof(ItemDrop.ItemData), typeof(int), typeof(bool), typeof(float), typeof(int))]
 	public class UpdateDurabilityDisplay
 	{
 		[UsedImplicitly]
@@ -363,7 +363,7 @@ public class Blacksmithing : BaseUnityPlugin
 		}
 	}
 
-	[HarmonyPatch(typeof(Player), nameof(Player.HaveRequirements), typeof(Recipe), typeof(bool), typeof(int))]
+	[HarmonyPatch(typeof(Player), nameof(Player.HaveRequirements), typeof(Recipe), typeof(bool), typeof(int), typeof(int))]
 	private class SaveCraftingItemPlayer
 	{
 		public static ItemDrop.ItemData? item;
@@ -382,7 +382,7 @@ public class Blacksmithing : BaseUnityPlugin
 	{
 		private static void Prefix()
 		{
-			SaveCraftingItemPlayer.item = InventoryGui.instance.m_selectedRecipe.Value;
+			SaveCraftingItemPlayer.item = InventoryGui.instance.m_selectedRecipe.ItemData;
 		}
 
 		private static void Finalizer() => SaveCraftingItemPlayer.item = null;
@@ -482,7 +482,7 @@ public class Blacksmithing : BaseUnityPlugin
 	{
 		private static void Postfix(InventoryGui __instance)
 		{
-			if (__instance.InCraftTab() && __instance.m_selectedRecipe.Key is { } recipe && CheckBlacksmithingItem(recipe.m_item.m_itemData.m_shared) && (!Game.instance.m_playerProfile.m_itemCraftStats.TryGetValue(recipe.m_item.m_itemData.m_shared.m_name, out float crafts) || crafts <= 0))
+			if (__instance.InCraftTab() && __instance.m_selectedRecipe.Recipe is { } recipe && CheckBlacksmithingItem(recipe.m_item.m_itemData.m_shared) && (!Game.instance.m_playerProfile.m_itemCraftStats.TryGetValue(recipe.m_item.m_itemData.m_shared.m_name, out float crafts) || crafts <= 0))
 			{
 				__instance.m_recipeDecription.text += "\n\n<color=orange>First craft bonus available</color>";
 			}
