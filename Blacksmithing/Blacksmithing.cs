@@ -22,7 +22,7 @@ namespace Blacksmithing;
 public class Blacksmithing : BaseUnityPlugin
 {
 	private const string ModName = "Blacksmithing";
-	private const string ModVersion = "1.3.1";
+	private const string ModVersion = "1.3.2";
 	private const string ModGUID = "org.bepinex.plugins.blacksmithing";
 
 	private static readonly ConfigSync configSync = new(ModGUID) { DisplayName = ModName, CurrentVersion = ModVersion, MinimumRequiredVersion = ModVersion };
@@ -349,6 +349,13 @@ public class Blacksmithing : BaseUnityPlugin
 				}
 			}
 		}
+	}
+
+	[HarmonyPatch(typeof(InventoryGui), nameof(InventoryGui.AddRecipeToList))]
+	private static class PreventAddRecipeToListForUpgradeItemsWithinCraftTab
+	{
+		// Somehow we trigger a runtime bug that causes the if and the else part of if (InCraftTab()) to both be executed in the UpdateRecipeList code ...
+		private static bool Prefix(InventoryGui __instance, ItemDrop.ItemData? item) => item is null || !__instance.InCraftTab();
 	}
 
 	[HarmonyPatch(typeof(Piece.Requirement), nameof(Piece.Requirement.GetAmount), typeof(int))]
